@@ -8,8 +8,11 @@ import 'package:yandex_mapkit/yandex_mapkit.dart';
 import 'package:yandex_mapkit_example/examples/widgets/control_button.dart';
 import 'package:yandex_mapkit_example/examples/widgets/map_page.dart';
 
+import 'station_painter.dart';
+
 class ClusterizedPlacemarkCollectionPage extends MapPage {
-  const ClusterizedPlacemarkCollectionPage({Key? key}) : super('ClusterizedPlacemarkCollection example', key: key);
+  const ClusterizedPlacemarkCollectionPage({Key? key})
+      : super('ClusterizedPlacemarkCollection example', key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -19,55 +22,62 @@ class ClusterizedPlacemarkCollectionPage extends MapPage {
 
 class _ClusterizedPlacemarkCollectionExample extends StatefulWidget {
   @override
-  _ClusterizedPlacemarkCollectionExampleState createState() => _ClusterizedPlacemarkCollectionExampleState();
+  _ClusterizedPlacemarkCollectionExampleState createState() =>
+      _ClusterizedPlacemarkCollectionExampleState();
 }
 
-class _ClusterizedPlacemarkCollectionExampleState extends State<_ClusterizedPlacemarkCollectionExample> {
+class _ClusterizedPlacemarkCollectionExampleState
+    extends State<_ClusterizedPlacemarkCollectionExample> {
   final List<MapObject> mapObjects = [];
 
-  final int kPlacemarkCount = 500;
+  final int kPlacemarkCount = 100;
   final Random seed = Random();
-  final MapObjectId mapObjectId = const MapObjectId('clusterized_placemark_collection');
-  final MapObjectId largeMapObjectId = const MapObjectId('large_clusterized_placemark_collection');
+  final MapObjectId mapObjectId =
+      const MapObjectId('clusterized_placemark_collection');
+  final MapObjectId largeMapObjectId =
+      const MapObjectId('large_clusterized_placemark_collection');
 
   Future<Uint8List> _buildClusterAppearance(Cluster cluster) async {
     final recorder = PictureRecorder();
     final canvas = Canvas(recorder);
-    const size = Size(200, 200);
+    const size = Size(60, 60);
     final fillPaint = Paint()
-      ..color = Colors.white
+      ..color = const Color(0xff23C990)
       ..style = PaintingStyle.fill;
     final strokePaint = Paint()
-      ..color = Colors.black
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 10;
-    const radius = 60.0;
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    const radius = 30.0;
 
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: cluster.size.toString(),
-        style: const TextStyle(color: Colors.black, fontSize: 50)
-      ),
-      textDirection: TextDirection.ltr
-    );
-
-    textPainter.layout(minWidth: 0, maxWidth: size.width);
-
-    final textOffset = Offset((size.width - textPainter.width) / 2, (size.height - textPainter.height) / 2);
     final circleOffset = Offset(size.height / 2, size.width / 2);
-
-    canvas.drawCircle(circleOffset, radius, fillPaint);
     canvas.drawCircle(circleOffset, radius, strokePaint);
-    textPainter.paint(canvas, textOffset);
+    canvas.drawCircle(circleOffset, 25, fillPaint);
 
-    final image = await recorder.endRecording().toImage(size.width.toInt(), size.height.toInt());
+    final image = await recorder
+        .endRecording()
+        .toImage(size.width.toInt(), size.height.toInt());
+    final pngBytes = await image.toByteData(format: ImageByteFormat.png);
+
+    return pngBytes!.buffer.asUint8List();
+  }
+
+  Future<Uint8List> _buildPlacemarkAppearance() async {
+    final recorder = PictureRecorder();
+    final canvas = Canvas(recorder);
+    const size = Size(160, 160);
+    const StationPainter('2\nkVt').paint(canvas, size);
+
+    final image = await recorder.endRecording().toImage(
+          size.width.toInt(),
+          size.height.toInt(),
+        );
     final pngBytes = await image.toByteData(format: ImageByteFormat.png);
 
     return pngBytes!.buffer.asUint8List();
   }
 
   double _randomDouble() {
-    return (500 - seed.nextInt(1000))/1000;
+    return (500 - seed.nextInt(1000)) / 1000;
   }
 
   @override
@@ -78,189 +88,96 @@ class _ClusterizedPlacemarkCollectionExampleState extends State<_ClusterizedPlac
       children: <Widget>[
         Expanded(
           child: YandexMap(
-            mapObjects: mapObjects
-          )
+            mapMode: MapMode.driving,
+            mapObjects: mapObjects,
+          ),
         ),
-        const SizedBox(height: 20),
-        Expanded(
-          child: SingleChildScrollView(
-            child: Column(
-              children: <Widget>[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: <Widget>[
-                    ControlButton(
-                      onPressed: () async {
-                        if (mapObjects.any((el) => el.mapId == mapObjectId)) {
-                          return;
-                        }
+        SafeArea(
+          minimum: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text('Set of $kPlacemarkCount placemarks'),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: <Widget>[
+                  ControlButton(
+                    onPressed: () async {
+                      if (mapObjects
+                          .any((el) => el.mapId == largeMapObjectId)) {
+                        return;
+                      }
+                      final image = await _buildPlacemarkAppearance();
 
-                        final mapObject = ClusterizedPlacemarkCollection(
-                          mapId: mapObjectId,
-                          radius: 30,
-                          minZoom: 15,
-                          onClusterAdded: (ClusterizedPlacemarkCollection self, Cluster cluster) async {
-                            return cluster.copyWith(
-                              appearance: cluster.appearance.copyWith(
-                                icon: PlacemarkIcon.single(PlacemarkIconStyle(
-                                  image: BitmapDescriptor.fromAssetImage('lib/assets/cluster.png'),
-                                  scale: 1
-                                ))
-                              )
-                            );
-                          },
-                          onClusterTap: (ClusterizedPlacemarkCollection self, Cluster cluster) {
-                            print('Tapped cluster');
-                          },
-                          placemarks: [
-                            PlacemarkMapObject(
-                              mapId: const MapObjectId('placemark_1'),
-                              point: const Point(latitude: 55.756, longitude: 37.618),
-                              consumeTapEvents: true,
-                              onTap: (PlacemarkMapObject self, Point point) => print('Tapped placemark at $point'),
-                              icon: PlacemarkIcon.single(PlacemarkIconStyle(
-                                image: BitmapDescriptor.fromAssetImage('lib/assets/place.png'),
-                                scale: 1
-                              ))
+                      final largeMapObject = ClusterizedPlacemarkCollection(
+                        mapId: largeMapObjectId,
+                        radius: 10,
+                        minZoom: 18,
+                        onClusterAdded: (self, cluster) async {
+                          return cluster.copyWith(
+                            appearance: cluster.appearance.copyWith(
+                              opacity: 1,
+                              icon: PlacemarkIcon.single(
+                                PlacemarkIconStyle(
+                                  image: BitmapDescriptor.fromBytes(
+                                    await _buildClusterAppearance(cluster),
+                                  ),
+                                  scale: 1,
+                                ),
+                              ),
                             ),
-                            PlacemarkMapObject(
-                              mapId: const MapObjectId('placemark_2'),
-                              point: const Point(latitude: 59.956, longitude: 30.313),
-                              icon: PlacemarkIcon.single(PlacemarkIconStyle(
-                                image: BitmapDescriptor.fromAssetImage('lib/assets/place.png'),
-                                scale: 1
-                              ))
-                            ),
-                            PlacemarkMapObject(
-                              mapId: const MapObjectId('placemark_3'),
-                              point: const Point(latitude: 39.956, longitude: 30.313),
-                              icon: PlacemarkIcon.single(PlacemarkIconStyle(
-                                image: BitmapDescriptor.fromAssetImage('lib/assets/place.png'),
-                                scale: 1
-                              ))
-                            ),
-                          ],
-                          onTap: (ClusterizedPlacemarkCollection self, Point point) => print('Tapped me at $point'),
-                        );
-
-                        setState(() {
-                          mapObjects.add(mapObject);
-                        });
-                      },
-                      title: 'Add'
-                    ),
-                    ControlButton(
-                      onPressed: () async {
-                        if (!mapObjects.any((el) => el.mapId == mapObjectId)) {
-                          return;
-                        }
-
-                        final mapObject = mapObjects
-                          .firstWhere((el) => el.mapId == mapObjectId) as ClusterizedPlacemarkCollection;
-
-                        setState(() {
-                          mapObjects[mapObjects.indexOf(mapObject)] = mapObject.copyWith(placemarks: [
-                            PlacemarkMapObject(
-                              mapId: const MapObjectId('placemark_2'),
-                              point: const Point(latitude: 59.956, longitude: 30.313),
-                              icon: PlacemarkIcon.single(PlacemarkIconStyle(
-                                image: BitmapDescriptor.fromAssetImage('lib/assets/place.png'),
-                                scale: 1
-                              ))
-                            ),
-                            PlacemarkMapObject(
-                              mapId: const MapObjectId('placemark_3'),
-                              point: const Point(latitude: 39.956, longitude: 31.313),
-                              icon: PlacemarkIcon.single(PlacemarkIconStyle(
-                                image: BitmapDescriptor.fromAssetImage('lib/assets/place.png'),
-                                scale: 1
-                              ))
-                            ),
-                            PlacemarkMapObject(
-                              mapId: const MapObjectId('placemark_4'),
-                              point: const Point(latitude: 59.945933, longitude: 30.320045),
-                              icon: PlacemarkIcon.single(PlacemarkIconStyle(
-                                image: BitmapDescriptor.fromAssetImage('lib/assets/place.png'),
-                                scale: 1
-                              ))
-                            ),
-                          ]);
-                        });
-                      },
-                      title: 'Update'
-                    ),
-                    ControlButton(
-                      onPressed: () async {
-                        setState(() {
-                          mapObjects.removeWhere((el) => el.mapId == mapObjectId);
-                        });
-                      },
-                      title: 'Remove'
-                    )
-                  ],
-                ),
-                Text('Set of $kPlacemarkCount placemarks'),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: <Widget>[
-                    ControlButton(
-                      onPressed: () async {
-                        if (mapObjects.any((el) => el.mapId == largeMapObjectId)) {
-                          return;
-                        }
-
-                        final largeMapObject = ClusterizedPlacemarkCollection(
-                          mapId: largeMapObjectId,
-                          radius: 30,
-                          minZoom: 15,
-                          onClusterAdded: (ClusterizedPlacemarkCollection self, Cluster cluster) async {
-                            return cluster.copyWith(
-                              appearance: cluster.appearance.copyWith(
-                                opacity: 0.75,
-                                icon: PlacemarkIcon.single(PlacemarkIconStyle(
-                                  image: BitmapDescriptor.fromBytes(await _buildClusterAppearance(cluster)),
-                                  scale: 1
-                                ))
-                              )
-                            );
-                          },
-                          onClusterTap: (ClusterizedPlacemarkCollection self, Cluster cluster) {
-                            print('Tapped cluster');
-                          },
-                          placemarks: List<PlacemarkMapObject>.generate(kPlacemarkCount, (i) {
+                          );
+                        },
+                        onClusterTap: (self, cluster) {
+                          print('Tapped cluster');
+                        },
+                        placemarks: List<PlacemarkMapObject>.generate(
+                          kPlacemarkCount,
+                          (i) {
                             return PlacemarkMapObject(
+                              opacity: 1,
                               mapId: MapObjectId('placemark_$i'),
-                              point: Point(latitude: 55.756 + _randomDouble(), longitude: 37.618 + _randomDouble()),
-                              icon: PlacemarkIcon.single(PlacemarkIconStyle(
-                                image: BitmapDescriptor.fromAssetImage('lib/assets/place.png'),
-                                scale: 1
-                              ))
+                              point: Point(
+                                latitude: 55.756 + _randomDouble(),
+                                longitude: 37.618 + _randomDouble(),
+                              ),
+                              icon: PlacemarkIcon.single(
+                                PlacemarkIconStyle(
+                                  image: BitmapDescriptor.fromBytes(
+                                    image,
+                                  ),
+                                  scale: 1,
+                                ),
+                              ),
                             );
-                          }),
-                          onTap: (ClusterizedPlacemarkCollection self, Point point) => print('Tapped me at $point'),
-                        );
+                          },
+                        ),
+                        onTap: (self, point) => print('Tapped me at $point'),
+                      );
 
-                        setState(() {
-                          mapObjects.add(largeMapObject);
-                        });
-                      },
-                      title: 'Add'
-                    ),
-                    ControlButton(
-                      onPressed: () async {
-                        setState(() {
-                          mapObjects.removeWhere((el) => el.mapId == largeMapObjectId);
-                        });
-                      },
-                      title: 'Remove'
-                    )
-                  ]
-                )
-              ]
-            )
-          )
+                      setState(() {
+                        mapObjects.add(largeMapObject);
+                      });
+                    },
+                    title: 'Add',
+                  ),
+                  ControlButton(
+                    onPressed: () async {
+                      setState(() {
+                        mapObjects.removeWhere(
+                          (el) => el.mapId == largeMapObjectId,
+                        );
+                      });
+                    },
+                    title: 'Remove',
+                  )
+                ],
+              )
+            ],
+          ),
         )
-      ]
+      ],
     );
   }
 }
